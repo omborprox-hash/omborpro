@@ -1,0 +1,115 @@
+rules_version = '2';
+// OmborPro — Firestore xavfsizlik qoidalari
+// admin: hammasi · seller: ombor ishlari · customer: faqat o'z ma'lumotlari + katalog
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signed() { return request.auth != null; }
+    function me() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function hasProfile() { return signed() && exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function isAdmin() { return hasProfile() && me().role == 'admin'; }
+    function isStaff() { return hasProfile() && me().role in ['admin', 'seller']; }
+    function isCust() { return hasProfile() && me().role == 'customer'; }
+    function myCid() { return me().cid; }
+
+    // Birinchi sozlash: egasi bir marta yaratiladi
+    match /config/owner {
+      allow read: if true;
+      allow create: if signed() && request.resource.data.uid == request.auth.uid;
+    }
+    match /config/settings {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow read: if signed() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAdmin()
+        // egasi o'zini admin qiladi (config/owner bilan bir batchda)
+        || (signed() && request.auth.uid == uid && request.resource.data.role == 'admin'
+            && !exists(/databases/$(database)/documents/config/owner)
+            && getAfter(/databases/$(database)/documents/config/owner).data.uid == uid)
+        // mijoz ilovada o'zi ro'yxatdan o'tadi
+        || (signed() && request.auth.uid == uid && request.resource.data.role == 'customer'
+            && request.resource.data.cid == uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // Login -> email (faqat bitta hujjatni o'qish mumkin, ro'yxat emas)
+    match /logins/{key} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create: if isAdmin()
+        || (signed() && key.matches('m_[0-9]+') && request.resource.data.cid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // Ommaviy katalog (tannarxsiz)
+    match /catalog/{id} {
+      allow read: if signed();
+      allow write: if isStaff();
+    }
+    match /categories/{id} {
+      allow read: if signed();
+      allow write: if isAdmin();
+    }
+    match /pimg/{id} {
+      allow read: if signed();
+      allow write: if isStaff();
+    }
+
+    // Mahsulotlar (tannarx bilan) — faqat xodimlar
+    match /products/{id} {
+      allow read, write: if isStaff();
+    }
+    match /receipts/{id} {
+      allow read, write: if isStaff();
+    }
+
+    match /customers/{id} {
+      allow read: if isStaff() || (isCust() && myCid() == id);
+      allow create: if isStaff()
+        || (signed() && request.auth.uid == id && request.resource.data.authUid == request.auth.uid
+            && request.resource.data.initDebt == 0);
+      allow update: if isStaff()
+        || (isCust() && myCid() == id
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'address', 'tg']));
+      allow delete: if isAdmin();
+    }
+
+    match /sales/{id} {
+      allow read: if isStaff() || (isCust() && resource.data.cid == myCid());
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+    match /payments/{id} {
+      allow read: if isStaff() || (isCust() && resource.data.cid == myCid());
+      allow create, update: if isStaff();
+      allow delete: if isAdmin();
+    }
+    match /orders/{id} {
+      allow read: if isStaff() || (isCust() && resource.data.cid == myCid());
+      allow create: if isStaff()
+        || (isCust() && request.resource.data.cid == myCid() && request.resource.data.status == 'kutilmoqda');
+      allow update: if isStaff()
+        || (isCust() && resource.data.cid == myCid() && resource.data.status == 'kutilmoqda'
+            && request.resource.data.cid == myCid()
+            && request.resource.data.status in ['kutilmoqda', 'bekor']);
+      allow delete: if isAdmin();
+    }
+
+    match /counters/{k} {
+      allow read: if isStaff() || (isCust() && k == 'orders');
+      allow write: if isStaff();
+      allow update: if isCust() && k == 'orders' && request.resource.data.n == resource.data.n + 1;
+    }
+
+    match /sellers/{id} {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+    match /expenses/{id} { allow read, write: if isAdmin(); }
+    match /suppliers/{id} { allow read, write: if isAdmin(); }
+    match /porders/{id} { allow read, write: if isAdmin(); }
+  }
+}

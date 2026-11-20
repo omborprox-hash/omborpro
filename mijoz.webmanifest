@@ -1,0 +1,22 @@
+{
+ "name": "Do'kon — onlayn buyurtma",
+ "short_name": "Do'kon",
+ "start_url": "./#ilova",
+ "scope": "./",
+ "display": "standalone",
+ "background_color": "#ffffff",
+ "theme_color": "#e8890c",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any maskable"
+  }
+ ]
+}
