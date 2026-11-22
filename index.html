@@ -1434,7 +1434,7 @@ function mapProd(id,d){const p={...d,id};if(p.hasImg)p.img=IMG[id]||imgPh(id);el
 function sub(ref,col,onFirst){let first=true;subs.push(ref.onSnapshot(snap=>{const m={};snap.docs.forEach(x=>{const d=x.data();m[x.id]=(col==='products'?mapProd(x.id,d):{...d,id:d.id||x.id})});const old=S[col];S[col]=m;
   if(col==='orders'&&ROLE_FB()!=='customer')resWatch(snap,old,first);
   if(first){first=false;onFirst&&onFirst()}if(!snap.metadata.fromCache)setSync('cloud');schedule()},e=>{console.warn(col,e);setSync('err');if(first){first=false;onFirst&&onFirst()}schedule()}))}
-function startSubs(){stopSubs();COLS.forEach(c=>S[c]={});const r=PROFILE&&PROFILE.role;let need=0,got=0;const done=()=>{if(++got>=need){dataReady=true;schedule()}};
+function startSubs(){stopSubs();COLS.forEach(c=>S[c]={});const r=PROFILE&&PROFILE.role;let need=0,got=0;const done=()=>{if(++got>=need){dataReady=true;schedule();setTimeout(ensureCounters,500)}};
  subs.push(fdb.doc('config/settings').onSnapshot(s=>{SETTINGS=s.exists?{...DEF,...s.data()}:{...DEF};schedule()},()=>{}));
  if(r==='admin'||r==='seller'){db=fdb;const cols=COLS.filter(c=>r==='admin'||!['expenses','suppliers','porders'].includes(c));need=cols.length;cols.forEach(c=>sub(fdb.collection(c),c,done))}
  else if(r==='customer'){const cid=PROFILE.cid;need=5;sub(fdb.collection('catalog'),'products',done);sub(fdb.collection('categories'),'categories',done);
@@ -1489,7 +1489,10 @@ function resWatch(snap,old,first){const add=o=>(o&&o.items||[]).forEach(i=>i.pid
  if(first){if(resBoot)return;resBoot=true;const lim=Date.now()-30*864e5;Object.values(S.orders).forEach(o=>{if((o.status==='kutilmoqda'||o.status==='bekor')&&num(o.ts)>lim)add(o)})}
  else snap.docChanges().forEach(ch=>{add(ch.doc.data());add(old&&old[ch.doc.id])});
  if(!resPids.size)return;clearTimeout(resT);resT=setTimeout(resFlush,1500)}
-function resFlush(){if(!dataReady){resT=setTimeout(resFlush,1500);return}const p=[...resPids];resPids=new Set();if(p.length)syncCatalog(p)}
+let ctrChecked=false;
+async function ensureCounters(){if(ctrChecked||ROLE_FB()!=='admin')return;ctrChecked=true;try{const s=await fdb.doc('counters/orders').get();if(!s.exists){const mx=Math.max(14000,...arr('orders').map(o=>num(o.no)));await fdb.doc('counters/orders').set({n:mx})}
+ const s2=await fdb.doc('counters/sales').get();if(!s2.exists){const mx=Math.max(0,...arr('sales').map(o=>num(o.no)));await fdb.doc('counters/sales').set({n:mx})}}catch(e){console.warn(e)}}
+function resFlush(){ensureCounters();if(!dataReady){resT=setTimeout(resFlush,1500);return}const p=[...resPids];resPids=new Set();if(p.length)syncCatalog(p)}
 async function syncCatalog(pids){C=compute();const b=fdb.batch();let n=0;for(const pid of new Set(pids)){if(!S.products[pid])continue;b.set(fdb.doc('catalog/'+pid),{stock:r2(C.stock[pid]||0)},{merge:true});n++}if(n)try{await b.commit()}catch(e){console.warn(e)}}
 function pubOf(p){const o={};PUBF.forEach(k=>{if(p[k]!==undefined)o[k]=p[k]});o.stock=r2(C.stock[p.id]||0);return o}
 async function save(col,o){const prev=S[col][o.id];S[col]={...S[col],[o.id]:o};schedule();if(!fdb)return;
@@ -1554,16 +1557,16 @@ async function appReg(e){e.preventDefault();const f=fd(e);const er=t=>{$('#aerr'
   PROFILE={role:'customer',cid:id};startSubs();A.reg=false;A.tab='home';toast('Xush kelibsiz!')}catch(x){er(fbErr(x))}return false}
 let ordBusy=false;
 async function appOrderSend(e){e.preventDefault();const c=custSess();if(!c||ordBusy)return false;const f=fd(e);const items=[];
- for(const [k,v] of Object.entries(acart)){const p=S.products[k];if(!p)continue;if((C.stock[k]||0)<v)return toast(p.name+': mavjud '+qty(C.stock[k]||0)),false;items.push({pid:k,name:p.name,unit:p.unit||'',qty:v,price:num(p.price)})}
- if(!items.length)return false;const id=uid();const ord={id,ts:Date.now(),cid:c.id,name:c.name,phone:c.phone||'',address:f.address.trim(),note:f.note||'',items,total:r2(sum(items,i=>i.qty*i.price)),rate:num(SETTINGS.rate),status:'kutilmoqda',src:'ilova'};
+ for(const [k,v] of Object.entries(acart)){const p=S.products[k];if(!p)continue;if((C.stock[k]||0)<v)return toast(p.name+': mavjud '+qty(C.stock[k]||0)),false;items.push({pid:String(k),name:String(p.name||''),unit:String(p.unit||''),qty:num(v),price:num(p.price)})}
+ if(!items.length)return false;const id=uid();const ord0={id,ts:Date.now(),cid:String(PROFILE.cid),name:String(c.name||''),phone:c.phone||'',address:f.address.trim(),note:f.note||'',items,total:r2(sum(items,i=>i.qty*i.price)),rate:num(SETTINGS.rate),status:'kutilmoqda',src:'ilova'};const ord=JSON.parse(JSON.stringify(ord0,(k,v)=>v===undefined?null:(typeof v==='number'&&!isFinite(v)?0:v)));
  ordBusy=true;toast('Yuborilmoqda…');let no;
  try{no=await fdb.runTransaction(async t=>{const cref=fdb.doc('counters/orders');const cs=await t.get(cref);const refs=items.map(i=>fdb.doc('catalog/'+i.pid));const sn=[];for(const r of refs)sn.push(await t.get(r));
-   items.forEach((it,k)=>{const st=sn[k].exists?num(sn[k].data().stock):0;if(st<it.qty)throw {code:'stock',msg:it.name+': mavjud '+qty(Math.max(0,st))}});
-   const n=cs.exists?num(cs.data().n)+1:14001;t.update(cref,{n});items.forEach((it,k)=>t.update(refs[k],{stock:r2(num(sn[k].data().stock)-it.qty)}));
+   items.forEach((it,k)=>{const st=sn[k].exists?(+num(sn[k].data().stock)||0):0;if(st<it.qty)throw {code:'stock',msg:it.name+': mavjud '+qty(Math.max(0,st))}});
+   const n=cs.exists?num(cs.data().n)+1:14001;if(cs.exists)t.update(cref,{n});else t.set(cref,{n});items.forEach((it,k)=>t.update(refs[k],{stock:r2((+num(sn[k].data().stock)||0)-it.qty)}));
    t.set(fdb.doc('orders/'+id),{...ord,no:n});return n})}
- catch(x){ordBusy=false;toast(x&&x.code==='stock'?x.msg+' — boshqa mijoz oldinroq buyurtma qildi':fbErr(x));return false}
+ catch(x){ordBusy=false;console.warn(x);toast(x&&x.code==='stock'?x.msg+' — boshqa mijoz oldinroq buyurtma qildi':fbErr(x)+(x&&x.message?' — '+String(x.message).slice(0,160):''));return false}
  ordBusy=false;S.orders={...S.orders,[id]:{...ord,no}};
- if(f.address.trim()&&f.address.trim()!==c.address)await save('customers',{...c,address:f.address.trim()});
+ if(f.address.trim()&&f.address.trim()!==c.address){S.customers={...S.customers,[c.id]:{...c,address:f.address.trim()}};fdb.doc('customers/'+c.id).update({address:f.address.trim()}).catch(e=>console.warn(e))}
  acart={};saveACart();A.tab='orders';A.ord=id;render(true);scrollTo(0,0);modal(`<div style="text-align:center;padding:10px 0"><div class="aok">✓</div><h2>Buyurtma #${no} qabul qilindi!</h2><p class="muted">Holatini “Buyurtmalar” bo'limida kuzatib borasiz. Tez orada siz bilan bog'lanamiz.</p><button class="btn pri wide" onclick="closeModal()">Yaxshi</button></div>`);return false}
 async function impWrite(p){try{await save('products',p);return true}catch(e){return false}}
 

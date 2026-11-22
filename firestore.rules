@@ -107,6 +107,7 @@ service cloud.firestore {
       allow read: if isStaff() || (isCust() && k == 'orders');
       allow write: if isStaff();
       allow update: if isCust() && k == 'orders' && request.resource.data.n == resource.data.n + 1;
+      allow create: if isCust() && k == 'orders' && request.resource.data.n == 14001;
     }
 
     match /sellers/{id} {
