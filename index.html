@@ -210,7 +210,7 @@ code{background:#f3f4f6;padding:2px 6px;border-radius:5px;font-size:13px}
 .pc{background:#fff;border:1px solid #e8ebef;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .15s,transform .15s}.pc:hover{box-shadow:0 8px 24px rgba(15,23,32,.08);transform:translateY(-1px)}
 .pc-media{position:relative;height:132px;background:#f7f8fa;display:flex;align-items:center;justify-content:center;cursor:pointer;border-bottom:1px solid #f0f2f4}.pc-media img{max-width:88%;max-height:88%;object-fit:contain}
 .pc-ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;letter-spacing:1px;background:linear-gradient(135deg,hsl(var(--h) 70% 96%),hsl(var(--h) 60% 90%));color:hsl(var(--h) 40% 42%)}
-.sbadge{position:absolute;top:8px;left:8px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:20px;background:#e8f6ee;color:#15803d;box-shadow:0 1px 2px rgba(0,0,0,.06)}.sbadge.low{background:#fff4e0;color:#b45309}.sbadge.out{background:#fdecea;color:#c0362c}.sbadge.inline{position:static;box-shadow:none;white-space:nowrap}
+.sbadge{position:absolute;top:8px;left:8px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:20px;background:#e8f6ee;color:#15803d;box-shadow:0 1px 2px rgba(0,0,0,.06)}.sbadge.low{background:#fff4e0;color:#b45309}.sbadge.out{background:#fdecea;color:#c0362c}.sbadge.res{top:36px;background:#eef2ff;color:#4338ca}.sbadge.inline{position:static;box-shadow:none;white-space:nowrap}
 .pc.is-out .pc-media>img,.pc.is-out .pc-ph{opacity:.45;filter:grayscale(.6)}
 .pc-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:3px;flex:1}
 .pc-cat{font-size:10.5px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -358,7 +358,13 @@ function compute0(){
   if(s.cid){c.debt[s.cid]=(c.debt[s.cid]||0)+(s.total-s.paid);c.bought[s.cid]=(c.bought[s.cid]||0)+s.total;c.lastBuy[s.cid]=Math.max(c.lastBuy[s.cid]||0,s.ts)}});
  arr('customers').forEach(x=>{c.debt[x.id]=(c.debt[x.id]||0)+num(x.initDebt)});
  arr('payments').forEach(p=>{c.debt[p.cid]=(c.debt[p.cid]||0)-num(p.amount)});
+ c.phys={...c.stock};c.res={};arr('orders').forEach(o=>{if(isPend(o))(o.items||[]).forEach(i=>{c.res[i.pid]=r2((c.res[i.pid]||0)+num(i.qty))})});
+ Object.keys(c.res).forEach(k=>{c.stock[k]=r2((c.stock[k]||0)-c.res[k])});
  return c}
+const isPend=o=>o&&o.status==='kutilmoqda'&&!o.saleId;
+const ownRes=(o,qt)=>isPend(o)?num(qt):0;
+const phys=id=>(C.phys&&C.phys[id]!=null?C.phys[id]:C.stock[id])||0;
+const resv=id=>(C.res&&C.res[id])||0;
 const isLow=p=>(C.stock[p.id]||0)<=num(p.minStock);
 
 /* ===== Navigatsiya va chizish ===== */
@@ -430,7 +436,7 @@ const topList=(rows,emptyT)=>rows.length?`<div class="list">${rows.join('')}</di
 V.dashboard=()=>{
  const [f,t]=rRange();const sales=arr('sales').filter(s=>s.ts>=f&&s.ts<t);
  const rev=sum(sales,s=>s.total),gp=sum(sales,profitOf),ex=sum(arr('expenses').filter(e=>e.ts>=f&&e.ts<t),e=>e.amount);
- const stockVal=sum(arr('products'),p=>Math.max(0,C.stock[p.id]||0)*num(p.cost));
+ const stockVal=sum(arr('products'),p=>Math.max(0,phys(p.id))*num(p.cost));
  const totDebt=sum(Object.values(C.debt).filter(d=>d>0),d=>d);
  const prod={};sales.forEach(s=>(s.items||[]).forEach(i=>{prod[i.pid]=prod[i.pid]||{pid:i.pid,name:i.name,unit:i.unit,q:0,t:0};prod[i.pid].q+=i.qty;prod[i.pid].t+=i.qty*i.price}));
  const topP=Object.values(prod).sort((a,b)=>b.t-a.t).slice(0,5);
@@ -605,7 +611,7 @@ const phInit=s=>String(s||'?').replace(/[^\p{L}\p{N}\s]/gu,' ').trim().split(/\s
 const stState=p=>{const st=C.stock[p.id]||0;return st<=0?'out':isLow(p)?'low':'ok'};
 V.tovarlar=()=>{const all=arr('products');const units=[...new Set(all.map(x=>x.unit).filter(Boolean))].sort();
  const nOut=all.filter(p=>stState(p)==='out').length,nLow=all.filter(p=>stState(p)==='low').length,nIn=all.length-nOut;
- const val=sum(all,p=>Math.max(0,C.stock[p.id]||0)*num(p.cost));
+ const val=sum(all,p=>Math.max(0,phys(p.id))*num(p.cost));
  const stat=(k,l,v,sub,cls)=>`<button class="pstat ${cls||''} ${prodF===k?'on':''}" onclick="prodF='${k}';prodLim=60;render(true)"><span>${l}</span><b>${v}</b>${sub?`<small>${sub}</small>`:''}</button>`;
  return `<div class="phead"><div><h1>Mahsulotlar</h1><p class="sub" style="margin:2px 0 0">${all.length} ta mahsulot · ${cats().length} ta kategoriya</p></div><span class="sp"></span>
 <div class="seg"><button class="${prodView==='grid'?'on':''}" onclick="prodView='grid';LS.set('op_pview','grid');render(true)" title="Kartochkalar" aria-label="Kartochkalar">${ico('dash')}</button><button class="${prodView==='list'?'on':''}" onclick="prodView='list';LS.set('op_pview','list');render(true)" title="Jadval" aria-label="Jadval">${ico('list')}</button></div>
@@ -625,7 +631,7 @@ function drawProds(){const el=$('#prodtbl');if(!el)return;const q=prodQ.trim().t
  ps.sort({name:byName,stockd:S_((a,b)=>stk(b)-stk(a)),stocka:S_((a,b)=>stk(a)-stk(b)),priced:S_((a,b)=>num(b.price)-num(a.price)),pricea:S_((a,b)=>num(a.price)-num(b.price)),new:S_((a,b)=>(b.created||0)-(a.created||0))}[prodSort]||byName);
  const total=ps.length;ps=ps.slice(0,prodLim);const adm=ROLE==='admin';
  const media=p=>p.img?`<img src="${esc(p.img)}" alt="" loading="lazy">`:`<div class="pc-ph" style="--h:${phHue(p.name)}">${esc(phInit(p.name))}</div>`;
- const badge=p=>{const s=stState(p),st=C.stock[p.id]||0;return `<span class="sbadge ${s}">${s==='out'?'Tugagan':qty(st)+' '+esc(p.unit||'')}</span>`};
+ const badge=p=>{const s=stState(p),st=C.stock[p.id]||0,b=resv(p.id);return `<span class="sbadge ${s}">${s==='out'?(b?'Hammasi band':'Tugagan'):qty(st)+' '+esc(p.unit||'')}</span>${b?`<span class="sbadge res" title="Buyurtmalarda band">band ${qty(b)}</span>`:''}`};
  const marg=p=>num(p.price)>0?Math.round((num(p.price)-num(p.cost))/num(p.price)*100):0;
  if(!total){el.innerHTML=`<div class="card">${empty(arr('products').length?'Bu shartlarga mos mahsulot topilmadi':'Hali mahsulot yo\'q')}</div>`;return}
  if(prodView==='grid')el.innerHTML=`<div class="pgrid2">${ps.map(p=>{const s=stState(p);return `<article class="pc ${s==='out'?'is-out':''}">
@@ -636,7 +642,7 @@ function drawProds(){const el=$('#prodtbl');if(!el)return;const q=prodQ.trim().t
  else el.innerHTML=`<div class="card ptable" style="padding:0"><div class="tw"><table><tr><th>Mahsulot</th><th class="hide-m">Birlik</th>${adm?'<th class="n hide-m">Asl narxi</th>':''}<th class="n">Sotish narxi</th>${adm?'<th class="n hide-m">Foyda</th>':''}<th class="n">Qoldiq</th>${adm?'<th class="n hide-m">Qiymati</th>':''}<th></th></tr>
   ${ps.map(p=>{const s=stState(p),st=C.stock[p.id]||0;return `<tr class="click" onclick="editProd('${p.id}')"><td><div class="tl"><span class="pt-thumb">${media(p)}</span><div style="min-width:0"><div class="pt-name">${esc(p.name)}</div><div class="small muted">${esc(p.cat||'Kategoriyasiz')}</div></div></div></td>
    <td class="hide-m muted">${esc(p.unit||'—')}</td>${adm?`<td class="n hide-m muted">${money(p.cost)}</td>`:''}<td class="n"><b>${money(p.price)}</b></td>${adm?`<td class="n hide-m"><span class="${marg(p)<5?'mg-neg':'mg-pos'}">${marg(p)}%</span></td>`:''}
-   <td class="n"><span class="sbadge inline ${s}">${s==='out'?'Tugagan':qty(st)+' '+esc(p.unit||'')}</span></td>${adm?`<td class="n hide-m">${money(Math.max(0,st)*num(p.cost))}</td>`:''}
+   <td class="n"><span class="sbadge inline ${s}">${s==='out'?(resv(p.id)?'Hammasi band':'Tugagan'):qty(st)+' '+esc(p.unit||'')}</span>${resv(p.id)?`<div class="small muted" style="margin-top:3px">omborda ${qty(phys(p.id))} · band ${qty(resv(p.id))}</div>`:''}</td>${adm?`<td class="n hide-m">${money(Math.max(0,phys(p.id))*num(p.cost))}</td>`:''}
    <td class="n" onclick="event.stopPropagation()"><button class="pc-add sm" ${s==='out'?'disabled':''} onclick="addCart('${p.id}');toast('Savatga qo\\'shildi')" aria-label="Savatga qo'shish">${ico('cart')}</button></td></tr>`}).join('')}</table></div></div>`;
  el.insertAdjacentHTML('beforeend',`<div class="pmore"><span class="muted small">${total} tadan ${ps.length} tasi ko'rsatilmoqda</span>${total>ps.length?`<button class="btn" onclick="prodLim+=60;drawProds()">Yana 60 ta ko'rsatish</button>`:''}</div>`)}
 const UNITS=['dona','karobka','kg','tonna','metr','qop','pachka','litr','m²','m³','komplekt'];
@@ -644,7 +650,7 @@ const UNITS=['dona','karobka','kg','tonna','metr','qop','pachka','litr','m²','m
 /* --- Mahsulot yaratish / tahrirlash sahifasi --- */
 let pf=null;
 function newProd(){pf={id:'',name:'',qty:'',unit:'',cost:'',price:'',minStock:'',sid:'',desc:'',img:'',cat:'',size:'',colors:'',offers:[]};location.hash='mahsulot'}
-function editProd(id){if(adminOnly())return;const p=S.products[id];if(!p)return;pf={...p,offers:[...(p.offers||[])],qty:qty(C.stock[id]||0),desc:p.desc||'',size:p.size||'',colors:p.colors||'',img:p.img||'',sid:p.sid||''};location.hash='mahsulot'}
+function editProd(id){if(adminOnly())return;const p=S.products[id];if(!p)return;pf={...p,offers:[...(p.offers||[])],qty:qty(phys(id)),desc:p.desc||'',size:p.size||'',colors:p.colors||'',img:p.img||'',sid:p.sid||''};location.hash='mahsulot'}
 const pfIn=(k,lbl,req,type='text',extra='')=>`<label>${req?'<i class="req">*</i> ':''}${lbl}<input class="inp" ${type==='number'?'type="number" step="any" min="0"':'type="text"'} value="${esc(pf[k])}" oninput="pf.${k}=this.value" ${extra}></label>`;
 V.mahsulot=()=>{if(!pf)newProd();const ss=arr('suppliers').sort(byName),isEd=!!pf.id;
  const others=arr('products').filter(p=>p.id!==pf.id).sort(byName);
@@ -679,13 +685,13 @@ async function pfSave(e){if(adminOnly())return false;e.preventDefault();const f=
  const p={...(old||{}),id:f.id||uid(),name:f.name.trim(),unit:f.unit,cost:num(f.cost),price:num(f.price),minStock:num(f.minStock),sid:f.sid,desc:f.desc.trim(),cat:f.cat.trim(),size:f.size.trim(),colors:f.colors.trim(),offers:f.offers.filter(id=>S.products[id])};
  if(f.img)p.img=f.img;else delete p.img;if(!old)p.created=Date.now();
  await save('products',p);
- const want=num(f.qty),have=old?(C.stock[p.id]||0):0,diff=r2(want-have);
+ const want=num(f.qty),have=old?phys(p.id):0,diff=r2(want-have);
  if(diff)await save('receipts',{id:uid(),ts:Date.now(),pid:p.id,qty:diff,cost:p.cost,sid:p.sid,note:old?'Tahrirda tuzatildi':'Boshlang\'ich qoldiq',adj:!!old});
  pf=null;toast(old?'Saqlandi':'Mahsulot yaratildi');location.hash='tovarlar';return false}
 function pickImg(inp){const f=inp.files&&inp.files[0];if(!f)return;const im=new Image();const u=URL.createObjectURL(f);im.onload=()=>{const s=480,c=document.createElement('canvas');const k=Math.min(1,s/Math.max(im.width,im.height));c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);if(pf){pf.img=c.toDataURL('image/jpeg',.72);render(true)}};im.onerror=()=>toast('Rasmni o\'qib bo\'lmadi');im.src=u}
 function prodDel(id){if(adminOnly())return;if(confirmKey!==id){confirmKey=id;return toast('O\'chirish uchun yana bir marta bosing')}confirmKey='';del('products',id);closeModal();pf=null;location.hash='tovarlar'}
-function adjForm(id){const p=S.products[id];modal(`<h2>Qoldiqni tuzatish</h2><p class="muted">${esc(p.name)} — tizimda: ${qty(C.stock[id]||0)} ${esc(p.unit||'')}</p><form onsubmit="return adjSave(event,'${id}')"><label>Haqiqiy qoldiq (sanoqdan keyin)<input class="inp" type="number" step="any" step="any" name="real" required></label><label>Izoh<input class="inp" name="note" placeholder="Inventarizatsiya"></label><button class="btn pri" style="margin-top:12px">Saqlash</button></form>`)}
-async function adjSave(e,id){e.preventDefault();const f=fd(e);const diff=num(f.real)-(C.stock[id]||0);if(diff)await save('receipts',{id:uid(),ts:Date.now(),pid:id,qty:diff,cost:num(S.products[id].cost),note:'Tuzatish: '+(f.note||'inventarizatsiya'),adj:true});closeModal();toast('Qoldiq tuzatildi');return false}
+function adjForm(id){const p=S.products[id];modal(`<h2>Qoldiqni tuzatish</h2><p class="muted">${esc(p.name)} — omborda: <b>${qty(phys(id))} ${esc(p.unit||'')}</b>${resv(id)?` · buyurtmalarda band: <b>${qty(resv(id))}</b>`:''}</p><form onsubmit="return adjSave(event,'${id}')"><label>Haqiqiy qoldiq (sanoqdan keyin)<input class="inp" type="number" step="any" step="any" name="real" required></label><label>Izoh<input class="inp" name="note" placeholder="Inventarizatsiya"></label><button class="btn pri" style="margin-top:12px">Saqlash</button></form>`)}
+async function adjSave(e,id){e.preventDefault();const f=fd(e);const diff=num(f.real)-phys(id);if(diff)await save('receipts',{id:uid(),ts:Date.now(),pid:id,qty:diff,cost:num(S.products[id].cost),note:'Tuzatish: '+(f.note||'inventarizatsiya'),adj:true});closeModal();toast('Qoldiq tuzatildi');return false}
 
 /* ===== Kirim ===== */
 V.kirim=()=>{const rs=arr('receipts').sort((a,b)=>b.ts-a.ts).slice(0,100);
@@ -885,7 +891,7 @@ V.buyurtma=()=>{const o=S.orders[curOrd];if(!o)return `<a href="#buyurtmalar" cl
   ${o.saleId&&S.sales[o.saleId]?`<dt>Sotuvchi</dt><dd>${esc(S.sellers[S.sales[o.saleId].sid]?.name||'—')}</dd>`:''}</dl>
  </div>
  <div class="card" style="padding:0"><div class="tw"><table class="oitems"><tr><th>Mahsulot nomi</th>${sh('qty','Miqdori')}${sh('price','Narxi')}${sh('sum','Umumiy narx')}${ordEdit?'<th></th>':''}</tr>
-  ${items.map(it=>{const stk=(C.stock[it.pid]||0)+(o.saleId?it.qty:0);return `<tr><td><span class="oname">${esc(it.name)}</span>${!o.saleId&&st!=='bekor'&&stk<it.qty?`<div class="small" style="color:var(--bad)">omborda ${qty(C.stock[it.pid]||0)}</div>`:''}</td>
+  ${items.map(it=>{const stk=(C.stock[it.pid]||0)+(o.saleId?it.qty:ownRes(o,it.qty));return `<tr><td><span class="oname">${esc(it.name)}</span>${!o.saleId&&st!=='bekor'&&stk<it.qty?`<div class="small" style="color:var(--bad)">mavjud ${qty(stk)}</div>`:''}</td>
    <td>${ordEdit?`<input class="inp sm" type="number" step="any" min="0" value="${it.qty}" onchange="ordItem('${o.id}',${it.i},'qty',this.value)">`:qty(it.qty)}</td>
    <td>${ordEdit&&ROLE==='admin'?`<input class="inp sm" style="width:100px" type="number" step="any" min="0" value="${it.price}" onchange="ordItem('${o.id}',${it.i},'price',this.value)"> <span class="small muted">${isUSD()?'$':''}</span>`:(isUSD()?uzs(it.price,r):money(it.price))}</td>
    <td>${isUSD()?uzs(it.qty*it.price,r):money(it.qty*it.price)}</td>${ordEdit?`<td><button class="x" onclick="ordItem('${o.id}',${it.i},'del')" aria-label="O'chirish">✕</button></td>`:''}</tr>`}).join('')||`<tr><td colspan="5">${empty('Mahsulot yo\'q')}</td></tr>`}</table></div>
@@ -911,7 +917,7 @@ function pickOrdSt(v){const o=S.orders[curOrd];if(!o)return;const cur=stOf(o);if
  save('orders',{...o,status:v})}
 async function ordCancel(id){if(adminOnly())return;const o=S.orders[id];if(o.saleId)await del('sales',o.saleId);await save('orders',{...o,status:'bekor',saleId:''});closeModal();toast('Buyurtma bekor qilindi')}
 function ordToSale(id,nst){const o=S.orders[id];const sels=arr('sellers').filter(s=>s.active!==false).sort(byName);
- for(const i of o.items||[]){if(!S.products[i.pid])return toast(i.name+' — mahsulot o\'chirilgan');if((C.stock[i.pid]||0)<i.qty)return toast(i.name+': omborda faqat '+qty(C.stock[i.pid]||0))}
+ for(const i of o.items||[]){if(!S.products[i.pid])return toast(i.name+' — mahsulot o\'chirilgan');const av=(C.stock[i.pid]||0)+ownRes(o,i.qty);if(av<i.qty)return toast(i.name+': mavjud faqat '+qty(av))}
  if(!(o.items||[]).length)return toast('Buyurtmada mahsulot yo\'q');
  const ex=(o.cid&&S.customers[o.cid])||arr('customers').find(c=>digits(c.phone)&&digits(c.phone)===digits(o.phone));
  modal(`<h2>Buyurtmani tasdiqlash</h2><p class="muted">#${ordNo(o)} · ${esc(o.name)} · ${money(o.total)}<br>${ex?'Mijoz: <b>'+esc(ex.name)+'</b>':'Yangi mijoz sifatida qo\'shiladi'}</p>
@@ -1425,7 +1431,8 @@ const PUBF=['id','name','unit','cat','price','desc','size','colors','offers','ha
 const pinPw=pin=>'pin:'+pin+':ob';
 function stopSubs(){subs.forEach(u=>{try{u()}catch(e){}});subs=[]}
 function mapProd(id,d){const p={...d,id};if(p.hasImg)p.img=IMG[id]||imgPh(id);else delete p.img;return p}
-function sub(ref,col,onFirst){let first=true;subs.push(ref.onSnapshot(snap=>{const m={};snap.docs.forEach(x=>{const d=x.data();m[x.id]=(col==='products'?mapProd(x.id,d):{...d,id:d.id||x.id})});S[col]=m;
+function sub(ref,col,onFirst){let first=true;subs.push(ref.onSnapshot(snap=>{const m={};snap.docs.forEach(x=>{const d=x.data();m[x.id]=(col==='products'?mapProd(x.id,d):{...d,id:d.id||x.id})});const old=S[col];S[col]=m;
+  if(col==='orders'&&ROLE_FB()!=='customer')resWatch(snap,old,first);
   if(first){first=false;onFirst&&onFirst()}if(!snap.metadata.fromCache)setSync('cloud');schedule()},e=>{console.warn(col,e);setSync('err');if(first){first=false;onFirst&&onFirst()}schedule()}))}
 function startSubs(){stopSubs();COLS.forEach(c=>S[c]={});const r=PROFILE&&PROFILE.role;let need=0,got=0;const done=()=>{if(++got>=need){dataReady=true;schedule()}};
  subs.push(fdb.doc('config/settings').onSnapshot(s=>{SETTINGS=s.exists?{...DEF,...s.data()}:{...DEF};schedule()},()=>{}));
@@ -1475,6 +1482,14 @@ async function initCloud(){}
 /* --- ikkinchi Firebase ilovasi orqali akkaunt yaratish (admin chiqib ketmasligi uchun) --- */
 async function mkAccount(email,pw){const app=firebase.initializeApp(FB_CONFIG,'sec'+Date.now());try{const r=await app.auth().createUserWithEmailAndPassword(email,pw);const id=r.user.uid;await app.auth().signOut();return id}finally{try{await app.delete()}catch(e){}}}
 /* --- yozish: mahsulot -> katalog + rasm, sotuv/kirim -> katalog qoldig'i --- */
+const ROLE_FB=()=>PROFILE&&PROFILE.role;
+/* buyurtmadagi band qilingan miqdor katalogdagi (mijoz ko'radigan) qoldiqqa ta'sir qiladi */
+let resPids=new Set(),resT=0,resBoot=false;
+function resWatch(snap,old,first){const add=o=>(o&&o.items||[]).forEach(i=>i.pid&&resPids.add(i.pid));
+ if(first){if(resBoot)return;resBoot=true;const lim=Date.now()-30*864e5;Object.values(S.orders).forEach(o=>{if((o.status==='kutilmoqda'||o.status==='bekor')&&num(o.ts)>lim)add(o)})}
+ else snap.docChanges().forEach(ch=>{add(ch.doc.data());add(old&&old[ch.doc.id])});
+ if(!resPids.size)return;clearTimeout(resT);resT=setTimeout(resFlush,1500)}
+function resFlush(){if(!dataReady){resT=setTimeout(resFlush,1500);return}const p=[...resPids];resPids=new Set();if(p.length)syncCatalog(p)}
 async function syncCatalog(pids){C=compute();const b=fdb.batch();let n=0;for(const pid of new Set(pids)){if(!S.products[pid])continue;b.set(fdb.doc('catalog/'+pid),{stock:r2(C.stock[pid]||0)},{merge:true});n++}if(n)try{await b.commit()}catch(e){console.warn(e)}}
 function pubOf(p){const o={};PUBF.forEach(k=>{if(p[k]!==undefined)o[k]=p[k]});o.stock=r2(C.stock[p.id]||0);return o}
 async function save(col,o){const prev=S[col][o.id];S[col]={...S[col],[o.id]:o};schedule();if(!fdb)return;
@@ -1537,10 +1552,17 @@ async function appReg(e){e.preventDefault();const f=fd(e);const er=t=>{$('#aerr'
   const b=fdb.batch();b.set(fdb.doc('customers/'+id),{id,name:f.name.trim(),phone:f.phone.trim(),tg:'',address:(f.address||'').trim(),initDebt:0,src:'ilova',created:Date.now(),authUid:id,pinSet:true});
   b.set(fdb.doc('users/'+id),{role:'customer',cid:id});b.set(fdb.doc('logins/m_'+dg),{email,cid:id});await b.commit();
   PROFILE={role:'customer',cid:id};startSubs();A.reg=false;A.tab='home';toast('Xush kelibsiz!')}catch(x){er(fbErr(x))}return false}
-async function appOrderSend(e){e.preventDefault();const c=custSess();if(!c)return false;const f=fd(e);const items=[];
+let ordBusy=false;
+async function appOrderSend(e){e.preventDefault();const c=custSess();if(!c||ordBusy)return false;const f=fd(e);const items=[];
  for(const [k,v] of Object.entries(acart)){const p=S.products[k];if(!p)continue;if((C.stock[k]||0)<v)return toast(p.name+': mavjud '+qty(C.stock[k]||0)),false;items.push({pid:k,name:p.name,unit:p.unit||'',qty:v,price:num(p.price)})}
- if(!items.length)return false;let no;try{no=await nextNo('orders',14000)}catch(x){no=Number(String(Date.now()).slice(-6))}const id=uid();
- await save('orders',{id,no,ts:Date.now(),cid:c.id,name:c.name,phone:c.phone||'',address:f.address.trim(),note:f.note||'',items,total:r2(sum(items,i=>i.qty*i.price)),rate:num(SETTINGS.rate),status:'kutilmoqda',src:'ilova'});
+ if(!items.length)return false;const id=uid();const ord={id,ts:Date.now(),cid:c.id,name:c.name,phone:c.phone||'',address:f.address.trim(),note:f.note||'',items,total:r2(sum(items,i=>i.qty*i.price)),rate:num(SETTINGS.rate),status:'kutilmoqda',src:'ilova'};
+ ordBusy=true;toast('Yuborilmoqda…');let no;
+ try{no=await fdb.runTransaction(async t=>{const cref=fdb.doc('counters/orders');const cs=await t.get(cref);const refs=items.map(i=>fdb.doc('catalog/'+i.pid));const sn=[];for(const r of refs)sn.push(await t.get(r));
+   items.forEach((it,k)=>{const st=sn[k].exists?num(sn[k].data().stock):0;if(st<it.qty)throw {code:'stock',msg:it.name+': mavjud '+qty(Math.max(0,st))}});
+   const n=cs.exists?num(cs.data().n)+1:14001;t.update(cref,{n});items.forEach((it,k)=>t.update(refs[k],{stock:r2(num(sn[k].data().stock)-it.qty)}));
+   t.set(fdb.doc('orders/'+id),{...ord,no:n});return n})}
+ catch(x){ordBusy=false;toast(x&&x.code==='stock'?x.msg+' — boshqa mijoz oldinroq buyurtma qildi':fbErr(x));return false}
+ ordBusy=false;S.orders={...S.orders,[id]:{...ord,no}};
  if(f.address.trim()&&f.address.trim()!==c.address)await save('customers',{...c,address:f.address.trim()});
  acart={};saveACart();A.tab='orders';A.ord=id;render(true);scrollTo(0,0);modal(`<div style="text-align:center;padding:10px 0"><div class="aok">✓</div><h2>Buyurtma #${no} qabul qilindi!</h2><p class="muted">Holatini “Buyurtmalar” bo'limida kuzatib borasiz. Tez orada siz bilan bog'lanamiz.</p><button class="btn pri wide" onclick="closeModal()">Yaxshi</button></div>`);return false}
 async function impWrite(p){try{await save('products',p);return true}catch(e){return false}}
